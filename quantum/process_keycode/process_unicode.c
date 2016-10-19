@@ -2,6 +2,7 @@
 
 static uint8_t input_mode;
 
+__attribute__((weak))
 uint16_t hex_to_keycode(uint8_t hex)
 {
   if (hex == 0x0) {
@@ -18,6 +19,11 @@ void set_unicode_input_mode(uint8_t os_target)
   input_mode = os_target;
 }
 
+uint8_t get_unicode_input_mode(void) {
+  return input_mode;
+}
+
+__attribute__((weak))
 void unicode_input_start (void) {
   switch(input_mode) {
   case UC_OSX:
@@ -40,6 +46,7 @@ void unicode_input_start (void) {
   wait_ms(UNICODE_TYPE_DELAY);
 }
 
+__attribute__((weak))
 void unicode_input_finish (void) {
   switch(input_mode) {
   case UC_OSX:
@@ -71,7 +78,35 @@ bool process_unicode(uint16_t keycode, keyrecord_t *record) {
   return true;
 }
 
+#ifdef UNICODEMAP_ENABLE
+__attribute__((weak))
+const uint32_t PROGMEM unicode_map[] = {
+};
+
+// 5 digit max because of linux limitation
+void register_hex32(uint32_t hex) {
+  for(int i = 4; i >= 0; i--) {
+    uint8_t digit = ((hex >> (i*4)) & 0xF);
+    register_code(hex_to_keycode(digit));
+    unregister_code(hex_to_keycode(digit));
+  }
+}
+
+bool process_unicode_map(uint16_t keycode, keyrecord_t *record) {
+  if ((keycode & QK_UNICODE_MAP) == QK_UNICODE_MAP && record->event.pressed) {
+    const uint32_t* map = unicode_map;
+    uint16_t index = keycode & 0x7FF;
+    unicode_input_start();
+    register_hex32(pgm_read_dword_far(&map[index]));
+    unicode_input_finish();
+  }
+  return true;
+}
+#endif
+
 #ifdef UCIS_ENABLE
+qk_ucis_state_t qk_ucis_state;
+
 void qk_ucis_start(void) {
   qk_ucis_state.count = 0;
   qk_ucis_state.in_progress = true;
